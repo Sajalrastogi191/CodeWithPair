@@ -105,6 +105,10 @@ io.on('connection', (socket) => {
         socket.in(roomId).emit(ACTIONS.SYNC_OUTPUT, { output, isRunning });
     });
 
+    socket.on(ACTIONS.LANGUAGE_CHANGE, ({ roomId, language }) => {
+        socket.in(roomId).emit(ACTIONS.LANGUAGE_CHANGE, { language });
+    });
+
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];
         rooms.forEach((roomId) => {

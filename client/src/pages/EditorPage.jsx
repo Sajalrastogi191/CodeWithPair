@@ -129,13 +129,26 @@ const EditorPage = () => {
                 if (output !== undefined) setOutput(output);
                 if (isRunning !== undefined) setIsRunning(isRunning);
             });
+
+            socketRef.current.on(ACTIONS.LANGUAGE_CHANGE, ({ language }) => {
+                setLanguage(language);
+            });
         }
         return () => {
             if (socketRef.current) {
                 socketRef.current.off(ACTIONS.SYNC_OUTPUT);
+                socketRef.current.off(ACTIONS.LANGUAGE_CHANGE);
             }
         }
     }, [socketRef.current]);
+
+    const handleLanguageChange = (e) => {
+        const lang = e.target.value;
+        setLanguage(lang);
+        if (socketRef.current) {
+            socketRef.current.emit(ACTIONS.LANGUAGE_CHANGE, { roomId, language: lang });
+        }
+    };
 
     const runCode = async () => {
         setIsRunning(true);
@@ -223,14 +236,14 @@ const EditorPage = () => {
                         {showOnlineDropdown && (
                             <div className="onlineDropdown">
                                 {clients
-                                    .filter(client => client.username !== location.state?.username)
+                                    .filter(client => client.socketId !== socketRef.current?.id)
                                     .map(client => (
                                         <div key={client.socketId} className="onlineUserItem">
                                             {client.username}
                                         </div>
                                     ))
                                 }
-                                {clients.filter(client => client.username !== location.state?.username).length === 0 && (
+                                {clients.filter(client => client.socketId !== socketRef.current?.id).length === 0 && (
                                     <div className="onlineUserItem">No other users</div>
                                 )}
                             </div>
@@ -245,7 +258,7 @@ const EditorPage = () => {
                     <select
                         className="languageSelector"
                         value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
+                        onChange={handleLanguageChange}
                     >
                         <option value="javascript">JavaScript</option>
                         <option value="python">Python</option>

@@ -9,6 +9,7 @@ const ACTIONS = {
     RECEIVE_MESSAGE: 'receive-message',
     CURSOR_CHANGE: 'cursor-change',
     SYNC_OUTPUT: 'sync-output',
+    LANGUAGE_CHANGE: 'language-change',
 };
 
 module.exports = ACTIONS;
