@@ -10,6 +10,7 @@ const ACTIONS = {
     CURSOR_CHANGE: 'cursor-change',
     SYNC_OUTPUT: 'sync-output',
     LANGUAGE_CHANGE: 'language-change',
+    SYNC_SAVE: 'sync-save',
 };
 
 module.exports = ACTIONS;

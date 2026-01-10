@@ -47,7 +47,7 @@ const EditorPage = () => {
             socketRef.current.on('connect_failed', (err) => handleErrors(err));
 
             function handleErrors(e) {
-                console.log('socket error', e);
+                // console.log('socket error', e);
                 toast.error('Socket connection failed, try again later.');
                 reactNavigator('/');
             }
@@ -63,7 +63,7 @@ const EditorPage = () => {
                 ({ clients, username, socketId }) => {
                     if (username !== location.state?.username) {
                         toast.success(`${username} joined the room.`);
-                        console.log(`${username} joined`);
+                        // console.log(`${username} joined`);
                     }
                     setClients(clients);
                     socketRef.current.emit(ACTIONS.SYNC_CODE, {
@@ -111,8 +111,7 @@ const EditorPage = () => {
         reactNavigator('/');
     }
 
-    const saveCode = async () => {
-        // Download file logic
+    const downloadCode = () => {
         try {
             const blob = new Blob([codeRef.current], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
@@ -133,6 +132,16 @@ const EditorPage = () => {
         } catch (e) {
             console.error("Download failed", e);
             toast.error("Could not download file");
+        }
+    };
+
+    const saveCode = async () => {
+        // Trigger for self
+        downloadCode();
+
+        // Notify others
+        if (socketRef.current) {
+            socketRef.current.emit(ACTIONS.SYNC_SAVE, { roomId });
         }
 
         // Cloud save
@@ -159,11 +168,16 @@ const EditorPage = () => {
             socketRef.current.on(ACTIONS.LANGUAGE_CHANGE, ({ language }) => {
                 setLanguage(language);
             });
+
+            socketRef.current.on(ACTIONS.SYNC_SAVE, () => {
+                downloadCode();
+            });
         }
         return () => {
             if (socketRef.current) {
                 socketRef.current.off(ACTIONS.SYNC_OUTPUT);
                 socketRef.current.off(ACTIONS.LANGUAGE_CHANGE);
+                socketRef.current.off(ACTIONS.SYNC_SAVE);
             }
         }
     }, [socketRef.current]);

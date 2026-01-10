@@ -112,6 +112,10 @@ io.on('connection', (socket) => {
         socket.in(roomId).emit(ACTIONS.LANGUAGE_CHANGE, { language });
     });
 
+    socket.on(ACTIONS.SYNC_SAVE, ({ roomId }) => {
+        socket.in(roomId).emit(ACTIONS.SYNC_SAVE, {});
+    });
+
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];
         rooms.forEach((roomId) => {
