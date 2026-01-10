@@ -118,7 +118,26 @@ const EditorPage = () => {
                 code: codeRef.current,
                 language
             });
-            toast.success('Code saved successfully');
+            toast.success('Code saved to cloud');
+
+            // Download file logic
+            const blob = new Blob([codeRef.current], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+
+            let extension = '.js';
+            if (language === 'python') extension = '.py';
+            else if (language === 'c++' || language === 'cpp') extension = '.cpp';
+            else if (language === 'java') extension = '.java';
+
+            link.download = `code-${roomId}${extension}`;
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast.success('File downloaded');
         } catch (error) {
             toast.error('Failed to save code');
             console.error(error);
