@@ -93,6 +93,18 @@ io.on('connection', (socket) => {
         socket.in(roomId).emit(ACTIONS.RECEIVE_MESSAGE, { message, username });
     });
 
+    socket.on(ACTIONS.CURSOR_CHANGE, ({ roomId, cursor }) => {
+        socket.in(roomId).emit(ACTIONS.CURSOR_CHANGE, {
+            cursor,
+            socketId: socket.id,
+            username: userSocketMap[socket.id]
+        });
+    });
+
+    socket.on(ACTIONS.SYNC_OUTPUT, ({ roomId, output, isRunning }) => {
+        socket.in(roomId).emit(ACTIONS.SYNC_OUTPUT, { output, isRunning });
+    });
+
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];
         rooms.forEach((roomId) => {

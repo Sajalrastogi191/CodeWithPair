@@ -123,8 +123,26 @@ const EditorPage = () => {
         }
     };
 
+    useEffect(() => {
+        if (socketRef.current) {
+            socketRef.current.on(ACTIONS.SYNC_OUTPUT, ({ output, isRunning }) => {
+                if (output !== undefined) setOutput(output);
+                if (isRunning !== undefined) setIsRunning(isRunning);
+            });
+        }
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.off(ACTIONS.SYNC_OUTPUT);
+            }
+        }
+    }, [socketRef.current]);
+
     const runCode = async () => {
         setIsRunning(true);
+        if (socketRef.current) {
+            socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: true });
+        }
+
         try {
             // Using Piston API (public) or Judge0 (needs key usually, but there are public instances)
             // For stability in this demo, I'll use Piston which is free and public.
@@ -143,6 +161,11 @@ const EditorPage = () => {
 
             const { run: { output, stderr, stdout } } = response.data;
             setOutput(output);
+
+            if (socketRef.current) {
+                socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: false, output });
+            }
+
             if (stderr) {
                 toast.error('Execution Error');
             } else {
@@ -152,9 +175,14 @@ const EditorPage = () => {
         } catch (error) {
             console.error(error);
             toast.error('Failed to run code');
-            setOutput('Error running code');
+            const errOutput = 'Error running code';
+            setOutput(errOutput);
+            if (socketRef.current) {
+                socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: false, output: errOutput });
+            }
         } finally {
             setIsRunning(false);
+            // Redundant if we emitted above, but safe local reset
         }
     }
 

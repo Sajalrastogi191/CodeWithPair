@@ -7,6 +7,8 @@ const ACTIONS = {
     LEAVE: 'leave',
     SEND_MESSAGE: 'send-message',
     RECEIVE_MESSAGE: 'receive-message',
+    CURSOR_CHANGE: 'cursor-change',
+    SYNC_OUTPUT: 'sync-output',
 };
 
 export default ACTIONS;
