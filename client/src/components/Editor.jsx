@@ -5,12 +5,16 @@ import ACTIONS from '../Actions';
 const CodeEditor = ({ socketRef, roomId, onCodeChange, language, readOnly }) => {
     const editorRef = useRef(null);
 
+    const isRemoteUpdate = useRef(false);
+
     function handleEditorDidMount(editor, monaco) {
         editorRef.current = editor;
     }
 
     function handleEditorChange(value, event) {
         onCodeChange(value);
+        if (isRemoteUpdate.current) return;
+
         if (socketRef.current) {
             socketRef.current.emit(ACTIONS.CODE_CHANGE, {
                 roomId,
@@ -25,7 +29,9 @@ const CodeEditor = ({ socketRef, roomId, onCodeChange, language, readOnly }) => 
                 if (code !== null && editorRef.current) {
                     const currentValue = editorRef.current.getValue();
                     if (code !== currentValue) {
+                        isRemoteUpdate.current = true;
                         editorRef.current.setValue(code);
+                        isRemoteUpdate.current = false;
                     }
                 }
             });
