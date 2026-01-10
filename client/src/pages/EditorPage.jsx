@@ -112,15 +112,8 @@ const EditorPage = () => {
     }
 
     const saveCode = async () => {
+        // Download file logic
         try {
-            await axios.post(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api/save`, {
-                roomId,
-                code: codeRef.current,
-                language
-            });
-            toast.success('Code saved to cloud');
-
-            // Download file logic
             const blob = new Blob([codeRef.current], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -136,10 +129,22 @@ const EditorPage = () => {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-
             toast.success('File downloaded');
+        } catch (e) {
+            console.error("Download failed", e);
+            toast.error("Could not download file");
+        }
+
+        // Cloud save
+        try {
+            await axios.post(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api/save`, {
+                roomId,
+                code: codeRef.current,
+                language
+            });
+            toast.success('Code saved to cloud');
         } catch (error) {
-            toast.error('Failed to save code');
+            toast.error('Failed to save to cloud');
             console.error(error);
         }
     };
