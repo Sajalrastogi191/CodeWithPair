@@ -85,8 +85,11 @@ io.on('connection', (socket) => {
         socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
     });
 
-    socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
+    socket.on(ACTIONS.SYNC_CODE, ({ socketId, code, language }) => {
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
+        if (language) {
+            io.to(socketId).emit(ACTIONS.LANGUAGE_CHANGE, { language });
+        }
     });
 
     socket.on(ACTIONS.SEND_MESSAGE, ({ roomId, message, username }) => {
