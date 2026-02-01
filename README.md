@@ -2,7 +2,7 @@
 
 A **real-time collaborative code editor** that allows multiple developers to code together simultaneously. Built with React, Node.js, Socket.IO, and Monaco Editor.
 
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](YOUR_DEPLOYED_URL_HERE)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)]([YOUR_DEPLOYED_URL_HERE](https://code-with-pair-d81z.vercel.app/))
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18+-blue?logo=react)](https://reactjs.org/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4.7-black?logo=socket.io)](https://socket.io/)
