@@ -1,119 +1,143 @@
 import React, { useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
-import ACTIONS from '../Actions';
+import * as Y from 'yjs';
+import { MonacoBinding } from 'y-monaco';
+import { SocketIOProvider } from 'y-socket.io';
 
-const CodeEditor = ({ socketRef, roomId, onCodeChange, language, readOnly }) => {
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
+/**
+ * Collaborative Monaco editor backed by Yjs CRDT.
+ *
+ * - A Y.Doc is created per room. The SocketIOProvider connects to the
+ *   server's /yjs namespace and syncs changes across all peers without
+ *   cursor jumping or conflict overwriting.
+ * - When `restoredCode` is provided (first user back in an empty room),
+ *   it is inserted into the Y.Text after the first sync so the doc
+ *   reflects the last-saved MongoDB state.
+ * - Remote cursors are shown via Yjs awareness (y-monaco handles rendering).
+ */
+const CodeEditor = ({ roomId, onCodeChange, language, readOnly, restoredCode, username }) => {
     const editorRef = useRef(null);
+    const monacoRef = useRef(null);
+    const ydocRef = useRef(null);
+    const providerRef = useRef(null);
+    const bindingRef = useRef(null);
+    // Track whether we have already applied the restored code
+    const restoredRef = useRef(false);
 
-    const isRemoteUpdate = useRef(false);
-
-    function handleEditorDidMount(editor, monaco) {
-        editorRef.current = editor;
-
-        // Listen for local cursor moves
-        editor.onDidChangeCursorPosition((e) => {
-            const position = e.position;
-            // Only emit if it's the user's manual move, assuming socket updates don't move cursor directly 
-            // (actually setValue might move cursor, but we want to broadcast user's active cursor)
-            if (socketRef.current) {
-                socketRef.current.emit(ACTIONS.CURSOR_CHANGE, {
-                    roomId,
-                    cursor: position
-                });
-            }
-        });
-    }
-
-    function handleEditorChange(value, event) {
-        onCodeChange(value);
-        if (isRemoteUpdate.current) return;
-
-        if (socketRef.current) {
-            socketRef.current.emit(ACTIONS.CODE_CHANGE, {
-                roomId,
-                code: value,
-            });
-        }
-    }
-
-    // Handle remote cursors
-    // We need to store decorations for each user: { socketId: [decorationId] }
-    const cursorDecorations = useRef({});
-
+    // ── Create the Yjs doc + SocketIOProvider once per room ─────────────────
     useEffect(() => {
-        if (socketRef.current) {
-            socketRef.current.on(ACTIONS.CODE_CHANGE, ({ code }) => {
-                if (code !== null && editorRef.current) {
-                    const currentValue = editorRef.current.getValue();
-                    if (code !== currentValue) {
-                        isRemoteUpdate.current = true;
-                        editorRef.current.setValue(code);
-                        isRemoteUpdate.current = false;
-                    }
-                }
-            });
+        const ydoc = new Y.Doc();
+        ydocRef.current = ydoc;
 
-            socketRef.current.on(ACTIONS.CURSOR_CHANGE, ({ cursor, socketId, username }) => {
-                if (editorRef.current) {
-                    const editor = editorRef.current;
-                    const monaco = window.monaco; // Monaco instance usually available globally on window.monaco if not passed directly, but we might need to access it differently. 
-                    // However, @monaco-editor/react doesn't expose 'monaco' globally by default inside this component easily without handleEditorDidMount.
-                    // Let's use clean approach: we need access to 'monaco' instance. 
-                    // Actually, editor.deltaDecorations is available on the editor instance. 
+        const provider = new SocketIOProvider(BACKEND_URL, roomId, ydoc, {
+            autoConnect: true,
+        });
+        providerRef.current = provider;
 
-                    let oldDecorations = cursorDecorations.current[socketId] || [];
-
-                    // Create new decorations
-                    const newDecorations = [
-                        {
-                            range: new window.monaco.Range(cursor.lineNumber, cursor.column, cursor.lineNumber, cursor.column),
-                            options: {
-                                className: 'remote-cursor',
-                                stickiness: window.monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-                                beforeContentClassName: 'remote-cursor-label',
-                                // We can use content to show label, but CSS before/after is easier or GlyphMargin.
-                                // Unfortunately passing dynamic text to CSS content is hard.
-                                // We can use hoverMessage for username!
-                                hoverMessage: { value: `User: ${username}` }
-                            }
-                        }
-                    ];
-
-                    // For label, we might need a OverlayWidget or similar, but let's try CSS-only first with 'remote-cursor'.
-                    // To show name, we can use a separate decoration or a ContentWidget. 
-                    // Simpler: use CSS class and maybe ignore name for now or use fixed color.
-                    // Let's rely on hover or just simple bar.
-
-                    const decorationIds = editor.deltaDecorations(oldDecorations, newDecorations);
-                    cursorDecorations.current[socketId] = decorationIds;
-                }
+        // Set local awareness state so peers can show our cursor label
+        if (username) {
+            provider.awareness.setLocalStateField('user', {
+                name: username,
+                color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'),
             });
         }
 
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.off(ACTIONS.CODE_CHANGE);
-                socketRef.current.off(ACTIONS.CURSOR_CHANGE);
+        // After the first Yjs sync: if we are alone and the doc is empty,
+        // seed it from the MongoDB-saved code (persistent reconnection).
+        const handleSync = (isSynced) => {
+            if (!isSynced || restoredRef.current) return;
+            if (!restoredCode) return;
+
+            const yText = ydoc.getText('monaco');
+            const current = yText.toString();
+            if (current === '' || current === '// Start coding...') {
+                ydoc.transact(() => {
+                    yText.delete(0, yText.length);
+                    yText.insert(0, restoredCode);
+                });
+                restoredRef.current = true;
             }
         };
-    }, [socketRef.current]);
+
+        provider.on('sync', handleSync);
+
+        return () => {
+            provider.off('sync', handleSync);
+            if (bindingRef.current) {
+                bindingRef.current.destroy();
+                bindingRef.current = null;
+            }
+            provider.destroy();
+            ydoc.destroy();
+            restoredRef.current = false;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [roomId]); // Only re-create if room changes
+
+    // ── Update restoredRef when restoredCode arrives (async) ────────────────
+    useEffect(() => {
+        // If the provider is already synced when restoredCode arrives late,
+        // apply it immediately.
+        if (!restoredCode || restoredRef.current) return;
+        const provider = providerRef.current;
+        const ydoc = ydocRef.current;
+        if (!provider || !ydoc) return;
+
+        const yText = ydoc.getText('monaco');
+        const current = yText.toString();
+        if (current === '' || current === '// Start coding...') {
+            ydoc.transact(() => {
+                yText.delete(0, yText.length);
+                yText.insert(0, restoredCode);
+            });
+            restoredRef.current = true;
+        }
+    }, [restoredCode]);
+
+    // ── Monaco mount: create the MonacoBinding ───────────────────────────────
+    function handleEditorDidMount(editor, monaco) {
+        editorRef.current = editor;
+        monacoRef.current = monaco;
+
+        const ydoc = ydocRef.current;
+        const provider = providerRef.current;
+
+        if (!ydoc || !provider) return;
+
+        const yText = ydoc.getText('monaco');
+
+        // MonacoBinding keeps the Monaco model in sync with the Y.Text.
+        // It also wires up awareness so remote cursors appear automatically.
+        const binding = new MonacoBinding(
+            yText,
+            editor.getModel(),
+            new Set([editor]),
+            provider.awareness
+        );
+        bindingRef.current = binding;
+
+        // Forward current value to parent for save / run operations
+        editor.onDidChangeModelContent(() => {
+            onCodeChange(editor.getValue());
+        });
+    }
 
     return (
         <Editor
             height="100vh"
             language={language}
-            // defaultLanguage="javascript"
-            defaultValue="// Start coding..."
             theme="vs-dark"
             onMount={handleEditorDidMount}
-            onChange={handleEditorChange}
             options={{
-                minimap: {
-                    enabled: false,
-                },
-                fontSize: 16, // User requested nicely designed app
+                minimap: { enabled: false },
+                fontSize: 16,
                 fontFamily: 'Fira Code, Consolas, monospace',
                 readOnly: readOnly,
+                cursorStyle: 'line',
+                wordWrap: 'on',
+                // Do NOT pass onChange here — MonacoBinding owns the model
             }}
         />
     );

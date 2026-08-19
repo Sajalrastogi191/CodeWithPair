@@ -11,6 +11,7 @@ const ACTIONS = {
     SYNC_OUTPUT: 'sync-output',
     LANGUAGE_CHANGE: 'language-change',
     SYNC_SAVE: 'sync-save',
+    RESTORE_SESSION: 'restore-session',
 };
 
 module.exports = ACTIONS;

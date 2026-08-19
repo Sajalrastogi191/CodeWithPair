@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { v4 as uuidV4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
     const navigate = useNavigate();
-
+    const { user, logout } = useAuth();
     const [roomId, setRoomId] = useState('');
-    const [username, setUsername] = useState('');
 
     const createNewRoom = (e) => {
         e.preventDefault();
@@ -17,24 +17,17 @@ const Home = () => {
     };
 
     const joinRoom = () => {
-        if (!roomId || !username) {
-            toast.error('ROOM ID & username is required');
+        if (!roomId) {
+            toast.error('Room ID is required');
             return;
         }
-
-        // Redirect
-        navigate(`/editor/${roomId}`, {
-            state: {
-                username,
-            },
-        });
+        navigate(`/editor/${roomId}`);
     };
 
     const handleInputEnter = (e) => {
-        if (e.code === 'Enter') {
-            joinRoom();
-        }
+        if (e.code === 'Enter') joinRoom();
     };
+
     return (
         <div className="homePageWrapper">
             <div className="formWrapper">
@@ -43,9 +36,21 @@ const Home = () => {
                     src="/code-sync.png"
                     alt="code-sync-logo"
                 />
+                <p className="authSwitchText" style={{ marginBottom: '0.5rem' }}>
+                    Signed in as <strong style={{ color: '#4aed88' }}>{user?.username}</strong>
+                    {' — '}
+                    <span
+                        className="authLink"
+                        onClick={logout}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        Sign out
+                    </span>
+                </p>
                 <h4 className="mainLabel">Paste invitation ROOM ID</h4>
                 <div className="inputGroup">
                     <input
+                        id="room-id-input"
                         type="text"
                         className="inputBox"
                         placeholder="ROOM ID"
@@ -53,20 +58,13 @@ const Home = () => {
                         value={roomId}
                         onKeyUp={handleInputEnter}
                     />
-                    <input
-                        type="text"
-                        className="inputBox"
-                        placeholder="USERNAME"
-                        onChange={(e) => setUsername(e.target.value)}
-                        value={username}
-                        onKeyUp={handleInputEnter}
-                    />
-                    <button className="btn joinBtn" onClick={joinRoom}>
+                    <button id="join-btn" className="btn joinBtn" onClick={joinRoom}>
                         Join
                     </button>
                     <span className="createInfo">
-                        If you don't have an invite then create &nbsp;
+                        If you don't have an invite then create&nbsp;
                         <a
+                            id="create-room-link"
                             onClick={createNewRoom}
                             href=""
                             className="createNewBtn"
@@ -76,8 +74,7 @@ const Home = () => {
                     </span>
                 </div>
             </div>
-            <footer>
-            </footer>
+            <footer />
         </div>
     );
 };
