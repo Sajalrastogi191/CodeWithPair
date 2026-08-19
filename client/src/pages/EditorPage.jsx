@@ -216,34 +216,57 @@ const EditorPage = () => {
             socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: true });
         }
 
-        const versionMap = {
-            javascript: '18.15.0',
-            python: '3.10.0',
-            'c++': '10.2.0',
-            cpp: '10.2.0',
-            java: '15.0.2',
-            typescript: '5.0.3',
-            go: '1.16.2',
+        const languageIdMap = {
+            javascript: 93, // Node.js
+            python: 71,
+            'c++': 54,
+            cpp: 54,
+            java: 62,
+            typescript: 74,
+            go: 60,
         };
 
         try {
-            const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
-                language: language === 'c++' ? 'cpp' : language,
-                version: versionMap[language] || '18.15.0',
-                files: [{ content: codeRef.current || '' }],
-            });
+            const options = {
+                method: 'POST',
+                url: 'https://judge0-ce.p.rapidapi.com/submissions',
+                params: {
+                    base64_encoded: 'false',
+                    wait: 'true',
+                    fields: '*'
+                },
+                headers: {
+                    'content-type': 'application/json',
+                    'x-rapidapi-host': 'judge0-ce.p.rapidapi.com',
+                    'x-rapidapi-key': import.meta.env.VITE_RAPIDAPI_KEY
+                },
+                data: {
+                    language_id: languageIdMap[language] || 93,
+                    source_code: codeRef.current || ''
+                }
+            };
 
-            const { run: { output, stderr } } = response.data;
-            setOutput(output);
+            const response = await axios.request(options);
+            
+            const out = response.data.stdout || response.data.stderr || response.data.compile_output || '';
+            const status = response.data.status?.description || '';
+            
+            const finalOutput = out ? `${out}\n[Status: ${status}]` : `[Status: ${status}]`;
+            
+            setOutput(finalOutput);
 
             if (socketRef.current) {
-                socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: false, output });
+                socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: false, output: finalOutput });
             }
 
-            if (stderr) toast.error('Execution Error');
-            else toast.success('Code ran successfully');
-        } catch {
-            const errOutput = 'Error running code';
+            if (response.data.stderr || response.data.compile_output) {
+                toast.error('Execution Error');
+            } else {
+                toast.success('Code ran successfully');
+            }
+        } catch (err) {
+            console.error(err);
+            const errOutput = 'Error running code. Please check your RapidAPI key or code syntax.';
             setOutput(errOutput);
             if (socketRef.current) {
                 socketRef.current.emit(ACTIONS.SYNC_OUTPUT, { roomId, isRunning: false, output: errOutput });
