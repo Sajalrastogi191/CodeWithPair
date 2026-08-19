@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 const { YSocketIO } = require('y-socket.io/dist/server');
 
 dotenv.config();
@@ -34,6 +35,12 @@ const ySocketIO = new YSocketIO(io);
 ySocketIO.initialize();
 
 // ─── Express middleware ────────────────────────────────────────────────────
+
+app.use(cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+}));
 
 app.use(express.static('build'));
 app.use(express.json());
